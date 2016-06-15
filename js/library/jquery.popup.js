@@ -14,12 +14,15 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
 
    // Allows generating a popup by jQuery.popup('contents')
    $.popup = function(options, data) {
+	  // Merge default settings:
       var settings = $.extend({}, $.popup.settings, options);
       $.popup.init(settings)
-      if (!settings.confirm)
-         $.popup.loading(settings)
 
-      $.isFunction(data) ? data.call(this, settings) : $.popup.reveal(settings, data)
+      if (data) {
+         $.isFunction(data) ? data.call(this, settings) : $.popup.reveal(settings, data);
+      } else {
+         $.popup.load(settings);
+      }
    }
 
    $.fn.popup = function(options) {
@@ -38,74 +41,19 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
 
       // Merge the two settings arrays into a central data store
       var settings = $.extend({}, $.popup.settings, options);
-      var sender = this;
 
       // Need to rewrite how popup is called, to incorporate
       // event delegation, as live() removed from jQuery in 1.7, and Vanilla
       // upgraded to 1.10.2 on Jan28, 2014.
       //this.live('click', function() {
-      var delegateToSelector = this.selector;
-      $(document).on('click', delegateToSelector, function() {
-
+      var selector = this.selector;
+      $(document).on('click', selector, function() {
          settings.sender = this;
          $.extend(settings, { popupType: $(this).attr('popupType') });
 
          $.popup.init(settings);
-         if (!settings.confirm)
-            $.popup.loading(settings);
 
-         var target = $.popup.findTarget(settings);
-         if (settings.confirm) {
-            // Bind to the "Okay" button click
-            $('#'+settings.popupId+' .Okay').focus().click(function() {
-               if (settings.followConfirm) {
-                  // follow the target
-                  document.location = target;
-               } else {
-                  // request the target via ajax
-                  $.popup.loading(settings);
-                  $.ajax({
-                     type: "GET",
-                     url: target,
-                     data: {'DeliveryType' : settings.deliveryType, 'DeliveryMethod' : 'JSON'},
-                     dataType: 'json',
-                     error: function(xhr) {
-                        gdn.informError(xhr);
-                     },
-                     success: function(json) {
-                        json = $.postParseJson(json);
-
-                        $.popup.close(settings);
-                        settings.afterConfirm(json, settings.sender);
-                        gdn.inform(json);
-                        gdn.processTargets(json.Targets);
-
-                        if (json.RedirectUrl)
-                           setTimeout(function() { document.location.replace(json.RedirectUrl); }, 300);
-                     }
-                  });
-               }
-            });
-         } else {
-            if (target) {
-               $.ajax({
-                  type: 'GET',
-                  url: target,
-                  data: {
-                     'DeliveryType': settings.deliveryType
-                  },
-                  error: function(request, textStatus, errorThrown) {
-                     $.popup.reveal(settings, request.responseText);
-                  },
-                  success: function(data) {
-                     $.popup.reveal(settings, data);
-                  }
-               });
-//          $.get(target, {'DeliveryType': settings.deliveryType}, function(data) {
-//            $.popup.reveal(settings, data)
-//          });
-            }
-         }
+         $.popup.load(settings);
 
          return false;
       });
@@ -129,15 +77,16 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
       settings.foundTarget = settings.targetUrl;
 
       // See if the matched element was an anchor. If it was, use the href.
-      if (!settings.foundTarget && $(settings.sender).attr('href') != 'undefined') {
-         settings.foundTarget = settings.sender.href;
-      } else {
-         // See if there were any anchors within the matched element.
-         // If there are, use the href from the first one.
-         if (!settings.foundTarget) {
+      if (!settings.foundTarget) {
+         if ($(settings.sender).attr('href') != undefined) {
+            settings.foundTarget = settings.sender.href;
+         } else {
+            // See if there were any anchors within the matched element.
+            // If there are, use the href from the first one.
             var anchor = $(settings.sender).find('a:first');
-            if (anchor.length > 0)
+            if (anchor.length > 0) {
                settings.foundTarget = anchor[0].href;
+            }
          }
       }
 
@@ -184,6 +133,11 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
       });
       $('#'+settings.popupId).show();
 
+      $('#'+settings.popupId+' .Body').css({
+         'max-height': pagesize[3] * .8,
+         'overflow-y': 'scroll'
+      });
+
       $(document).bind('keydown.popup', function(e) {
          if (e.keyCode == 27)
             $.popup.close(settings);
@@ -227,6 +181,71 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
       $('body').trigger('popupLoading');
    }
 
+   $.popup.load = function(settings) {
+       if (!settings.confirm) {
+          $.popup.loading(settings);
+       }
+
+	   var target = $.popup.findTarget(settings);
+       if (settings.confirm) {
+          // Bind to the "Okay" button click
+          $('#'+settings.popupId+' .Okay').focus().click(function() {
+             if (settings.followConfirm) {
+                // follow the target
+                document.location = target;
+             } else {
+                // request the target via ajax
+                var ajaxData = {'DeliveryType' : settings.deliveryType, 'DeliveryMethod' : 'JSON'};
+                if (settings.doPost) {
+                   ajaxData.TransientKey = gdn.definition('TransientKey');
+                }
+                $.popup.loading(settings);
+
+                $.ajax({
+                   method: settings.doPost ? 'POST' : 'GET',
+                   url: target,
+                   data: ajaxData,
+                   dataType: 'json',
+                   error: function(xhr) {
+                      gdn.informError(xhr);
+                   },
+                   success: function(json) {
+                      $.popup.close(settings);
+                      settings.afterConfirm(json, settings.sender);
+                      gdn.inform(json);
+                      gdn.processTargets(json.Targets);
+
+                      if (json.RedirectUrl)
+                         setTimeout(function() { document.location.replace(json.RedirectUrl); }, 300);
+                   }
+                });
+             }
+          });
+       } else {
+          if (target) {
+             var ajaxData = { 'DeliveryType': settings.deliveryType };
+             if (settings.doPost) {
+                ajaxData.TransientKey = gdn.definition('TransientKey');
+             }
+
+             $.ajax({
+                method: settings.doPost ? 'POST' : 'GET',
+                url: target,
+                data: ajaxData,
+                error: function(request, textStatus, errorThrown) {
+                   $.popup.reveal(settings, request.responseText);
+                },
+                success: function(data) {
+                   $.popup.reveal(settings, data);
+                }
+             });
+//        $.get(target, {'DeliveryType': settings.deliveryType}, function(data) {
+//          $.popup.reveal(settings, data)
+//        });
+          }
+       }
+   }
+
    $.popup.reveal = function(settings, data) {
       // First see if we've retrieved json or something else
       var json = false;
@@ -238,8 +257,10 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
 
       if (json == false) {
          // This is something other than json, so just put it into the popup directly
-         if (data) // Prevent blank popups
-            $('#'+settings.popupId+' .Content').append(data);
+         if (data) { // Prevent blank popups
+             $('#'+settings.popupId+' .Content').append(data).trigger('contentLoad');
+         }
+
       } else {
          gdn.inform(json);
          formSaved = json['FormSaved'];
@@ -257,8 +278,9 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
          // we need to reload the invitation table. Is there a reason not to reload
          // the content?
          // if (formSaved == false)
-         if (data) // Prevent blank popups
-            $('#'+settings.popupId+' .Content').html(data);
+         if (data) { // Prevent blank popups
+             $('#'+settings.popupId+' .Content').html(data).trigger('contentLoad');
+         }
       }
 
       $('#'+settings.popupId+' .Loading').remove();
@@ -282,7 +304,6 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
                settings.onSave(settings); // Notify the user that it is being saved.
             },
             success: function(json) {
-               json = $.postParseJson(json);
                gdn.inform(json);
                gdn.processTargets(json.Targets);
 
@@ -312,8 +333,6 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
                if (typeof(data) == 'object') {
                   if (data.RedirectUrl)
                      setTimeout(function() { document.location.replace(data.RedirectUrl); }, 300);
-
-                  $.postParseJson(data);
                }
                $.popup.reveal(settings, data);
                //$('#'+settings.popupId+' .Content').html(data);
@@ -334,6 +353,7 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
 
    $.popup.settings = {
       targetUrl:        false,        // Use this URL instead of one provided by the matched element?
+      doPost:           false,        // Use POST, instead of GET, when performing an AJAX request?
       confirm:          false,        // Pop up a confirm message?
       followConfirm:    false,        // Follow the confirm url after OK, or request it with ajax?
       afterConfirm:     function(json, sender) {
@@ -365,7 +385,7 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
           <div class="Content"> \
           </div> \
           <div class="Footer"> \
-            <a href="#" class="Close"><span>×</span></a> \
+            <a href="#" class="Close"><span>&times;</span></a> \
           </div> \
         </div> \
       </div> \

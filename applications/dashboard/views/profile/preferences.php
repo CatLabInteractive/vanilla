@@ -1,107 +1,125 @@
 <?php if (!defined('APPLICATION')) exit(); ?>
 <style>
-   table.PreferenceGroup {
-      width: 500px;
-   }
-   thead td {
-      vertical-align: bottom;
-      text-align: center;
-   }
-   table.PreferenceGroup thead .TopHeading {
-      border-bottom: none;
-   }
-   table.PreferenceGroup thead .BottomHeading {
-      border-top: none;
-   }
-   td.PrefCheckBox {
-      width: 50px;
-		text-align: center;
-   }
-   table.PreferenceGroup tbody tr:hover td {
-      background: #efefef;
-   }
-   .Info {
-      width: 486px;
-   }
+    table.PreferenceGroup {
+        width: 500px;
+    }
+
+    thead td {
+        vertical-align: bottom;
+        text-align: center;
+    }
+
+    table.PreferenceGroup thead .TopHeading {
+        border-bottom: none;
+    }
+
+    table.PreferenceGroup thead .BottomHeading {
+        border-top: none;
+    }
+
+    td.PrefCheckBox {
+        width: 50px;
+        text-align: center;
+    }
+
+    table.PreferenceGroup tbody tr:hover td {
+        background: #efefef;
+    }
+
+    .Info {
+        width: 486px;
+    }
 </style>
 <div class="FormTitleWrapper">
-<h1 class="H"><?php echo $this->Data('Title');  ?></h1>
-<div class="Preferences">
-<?php
-echo $this->Form->Open();
-echo $this->Form->Errors();
-$this->FireEvent("BeforePreferencesRender");
+    <h1 class="H"><?php echo $this->data('Title'); ?></h1>
 
-foreach ($this->Data('PreferenceGroups') as $PreferenceGroup => $Preferences) {
-   echo Wrap(T($PreferenceGroup == 'Notifications' ? 'General' : $PreferenceGroup), 'h2');
-   ?>
-   <table class="PreferenceGroup">
-      <thead>
-         <tr>
-         <?php
-         echo Wrap(T('Notification'), 'td', array('style' => 'text-align: left'));
+    <div class="Preferences">
+        <?php
+        echo $this->Form->open();
+        echo $this->Form->errors();
+        $this->fireEvent("BeforePreferencesRender");
 
-         $CountTypes = 0;
-         foreach ($this->Data("PreferenceTypes.{$PreferenceGroup}") as $PreferenceType) {
-            echo Wrap(T($PreferenceType), 'td', array('class' => 'PrefCheckBox'));
-            $PreferenceTypeOrder[$PreferenceType] = $CountTypes;
-            $CountTypes++;
-         }
-         ?>
-         </tr>
-      </thead>
-      <tbody>
-         <?php
-            foreach ($Preferences as $Names) {
-               // Make sure there are preferences.
-               $ConfigCount = 0;
-               foreach ($Names as $Name) {
-                  $CP = C('Preferences.'.$Name, '0');
-                  if ($CP !== FALSE && $CP != 2)
-                     $ConfigCount++;
-               }
-               if ($ConfigCount == 0)
-                  continue;
+        foreach ($this->data('PreferenceGroups') as $PreferenceGroup => $Preferences) {
+            echo wrap(t($PreferenceGroup == 'Notifications' ? 'General' : $PreferenceGroup), 'h2');
+            ?>
+            <table class="PreferenceGroup">
+                <thead>
+                <tr>
+                    <?php
+                    echo wrap(t('Notification'), 'td', array('style' => 'text-align: left'));
 
-               echo '<tr>';
-               $Desc = GetValue($Name, $this->Data("PreferenceList.{$PreferenceGroup}"));
-               if (is_array($Desc))
-                  list($Desc, $Location) = $Desc;
-               echo Wrap($Desc, 'td', array('class' => 'Description'));
+                    $PreferenceTypes = $this->data("PreferenceTypes.{$PreferenceGroup}");
+                    foreach ($PreferenceTypes as $PreferenceType) {
+                        echo wrap(t($PreferenceType), 'td', array('class' => 'PrefCheckBox'));
+                    }
+                    ?>
+                </tr>
+                </thead>
+                <tbody>
+                <?php
+                // Get all descriptions of possible notifications
+                $Descriptions = $this->data("PreferenceList.{$PreferenceGroup}");
+                // Loop through all possible preferences.
+                foreach ($Preferences as $Event => $Settings) {
+                    $RowHasConfigValues = false;
+                    $ColumnsMarkup = '';
+                    // Loop through all means of notification.
+                    foreach ($PreferenceTypes as $NotificationType) {
+                        $ConfigPreference = c('Preferences.'.$NotificationType.'.'.$Event, 0);
+                        if (
+                            !in_array($NotificationType.'.'.$Event, $Settings) ||
+                            $ConfigPreference === false ||
+                            $ConfigPreference == 2
+                         ) {
+                            // If preference does not exist, or is excluded by
+                            // a config setting, show an empty cell.
+                            $ColumnsMarkup .= wrap(
+                                '&nbsp;',
+                                'td',
+                                array('class' => 'PrefCheckBox')
+                            );
+                        } else {
+                            // Everything's fine, show checkbox.
+                            $ColumnsMarkup .= wrap(
+                                $this->Form->CheckBox(
+                                    $NotificationType.'.'.$Event,
+                                    '',
+                                    array('value' => '1')
+                                ),
+                                'td',
+                                array('class' => 'PrefCheckBox')
+                            );
+                            // Set flag so that line is printed.
+                            $RowHasConfigValues = true;
+                        }
+                    }
+                    // Check if there are config values in this row.
+                    if ($RowHasConfigValues) {
+                        // Make sure we have complete numeric indexes.
+                        $Settings = array_values($Settings);
 
-               $LastName = '';
-               $i = 0;
-               foreach ($Names as $Name) {
-                  $NameTypeExplode = explode(".", $Name);
-                  $NameType = $NameTypeExplode[0];
-                  $ConfigPref = C('Preferences.'.$Name, '0');
-                  if ($ConfigPref === FALSE || $ConfigPref == 2) {
-                     echo Wrap('&nbsp;', 'td', array('class' => 'PrefCheckBox'));
-                  } else {
-                  	if (count($Names) < $CountTypes) {
-               			   $PreferenceTypeOrderCount = 0;
-               			   foreach ($PreferenceTypeOrder as $PreferenceTypeName => $PreferenceTypeOrderValue) {
-               			       if ($NameType == $PreferenceTypeName) {
-               				   if ($PreferenceTypeOrderValue == $PreferenceTypeOrderCount) echo Wrap($this->Form->CheckBox($Name, '', array('value' => '1')), 'td', array('class' => 'PrefCheckBox'));
-               			       } else echo Wrap('&nbsp;', 'td', array('class' => 'PrefCheckBox'));
-               			       $PreferenceTypeOrderCount++;
-               			   }
-               		} else echo Wrap($this->Form->CheckBox($Name, '', array('value' => '1')), 'td', array('class' => 'PrefCheckBox'));
-                  }
-                  $LastName = $Name;
-                  $i++;
-               }
-
-               echo '</tr>';
-            }
-         ?>
-      </tbody>
-   </table>
-<?php
-}
-$this->FireEvent('CustomNotificationPreferneces');
-echo $this->Form->Close('Save Preferences', '', array('class' => 'Button Primary'));
-$this->FireEvent("AfterPreferencesRender");
-?>
-</div>
+                        $Description = val($Settings[0], $Descriptions);
+                        if (is_array($Description)) {
+                            $Description = $Description[0];
+                        }
+                        echo '<tr>';
+                        echo wrap(
+                            $Description,
+                            'td',
+                            array('class' => 'Description')
+                        );
+                        echo $ColumnsMarkup;
+                        echo '</tr>';
+                    }
+                }
+                ?>
+                </tbody>
+            </table>
+        <?php
+        }
+        $this->fireEvent('CustomNotificationPreferences');
+        echo $this->Form->close('Save Preferences', '', array('class' => 'Button Primary'));
+        $this->fireEvent("AfterPreferencesRender");
+        ?>
+    </div>
 </div>

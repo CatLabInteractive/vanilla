@@ -1,85 +1,91 @@
-<?php if (!defined('APPLICATION')) exit();
-/*
-Copyright 2008, 2009 Vanilla Forums Inc.
-This file is part of Garden.
-Garden is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-Garden is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-You should have received a copy of the GNU General Public License along with Garden.  If not, see <http://www.gnu.org/licenses/>.
-Contact Vanilla Forums Inc. at support [at] vanillaforums [dot] com
-*/
+<?php
+/**
+ * Discussions module
+ *
+ * @copyright 2009-2016 Vanilla Forums Inc.
+ * @license http://www.opensource.org/licenses/gpl-2.0.php GNU GPL v2
+ * @package Vanilla
+ * @since 2.0
+ */
 
 /**
  * Renders recently active discussions
  */
 class DiscussionsModule extends Gdn_Module {
-   public $Limit = 10;
-   public $Prefix = 'Discussion';
 
-   /**
-    * @var array Limit the discussions to just this list of categories, checked for view permission.
-    */
-   protected $categoryIDs;
+    /** @var int Display limit. */
+    public $Limit = 10;
 
+    /** @var string  */
+    public $Prefix = 'Discussion';
 
-   public function __construct() {
-      parent::__construct();
-      $this->_ApplicationFolder = 'vanilla';
-      $this->FireEvent('Init');
-   }
+    /** @var array Limit the discussions to just this list of categories, checked for view permission. */
+    protected $categoryIDs;
 
-   /**
-    * Get the data for the module.
-    *
-    * @param int|bool $limit Override the number of discussions to display.
-    */
-   public function GetData($limit = FALSE) {
-      if (!$limit) {
-         $limit = $this->Limit;
-      }
+    /**
+     *
+     *
+     * @throws Exception
+     */
+    public function __construct() {
+        parent::__construct();
+        $this->_ApplicationFolder = 'vanilla';
+        $this->fireEvent('Init');
+    }
 
-      $discussionModel = new DiscussionModel();
+    /**
+     * Get the data for the module.
+     *
+     * @param int|bool $limit Override the number of discussions to display.
+     */
+    public function getData($limit = false) {
+        if (!$limit) {
+            $limit = $this->Limit;
+        }
 
-      $categoryIDs = $this->getCategoryIDs();
-      $where = array('Announce' => 'all');
+        $discussionModel = new DiscussionModel();
 
-      if ($categoryIDs) {
-         $where['d.CategoryID'] = CategoryModel::filterCategoryPermissions($categoryIDs);
-      } else {
-         $discussionModel->Watching = TRUE;
-      }
+        $categoryIDs = $this->getCategoryIDs();
+        $where = array('Announce' => 'all');
 
-      $this->SetData('Discussions', $discussionModel->Get(0, $limit, $where));
-   }
+        if ($categoryIDs) {
+            $where['d.CategoryID'] = CategoryModel::filterCategoryPermissions($categoryIDs);
+        } else {
+            $discussionModel->Watching = true;
+        }
 
-   public function AssetTarget() {
-      return 'Panel';
-   }
+        $this->setData('Discussions', $discussionModel->get(0, $limit, $where));
+    }
 
-   public function ToString() {
-      if (!$this->Data('Discussions')) {
-         $this->GetData();
-      }
+    public function assetTarget() {
+        return 'Panel';
+    }
 
-      require_once Gdn::Controller()->FetchViewLocation('helper_functions', 'Discussions', 'Vanilla');
+    public function toString() {
+        if (!$this->data('Discussions')) {
+            $this->GetData();
+        }
 
-      return parent::ToString();
-   }
+        require_once Gdn::controller()->fetchViewLocation('helper_functions', 'Discussions', 'Vanilla');
 
-   /**
-    * Get a list of category IDs to limit.
-    *
-    * @return array
-    */
-   public function getCategoryIDs() {
-      return $this->categoryIDs;
-   }
+        return parent::ToString();
+    }
 
-   /**
-    * Set a list of category IDs to limit.
-    *
-    * @param array $categoryIDs
-    */
-   public function setCategoryIDs($categoryIDs) {
-      $this->categoryIDs = $categoryIDs;
-   }
+    /**
+     * Get a list of category IDs to limit.
+     *
+     * @return array
+     */
+    public function getCategoryIDs() {
+        return $this->categoryIDs;
+    }
+
+    /**
+     * Set a list of category IDs to limit.
+     *
+     * @param array $categoryIDs
+     */
+    public function setCategoryIDs($categoryIDs) {
+        $this->categoryIDs = $categoryIDs;
+    }
 }

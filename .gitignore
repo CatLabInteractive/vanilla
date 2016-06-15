@@ -20,7 +20,6 @@ Thumbs.db
 *.swp
 _notes
 */_archive/*
-
 ~*
 .project
 .settings
@@ -30,3 +29,11 @@ _notes
 nbproject/project.properties
 nbproject/project.xml
 /vendor/
+node_modules/
+bower_components/
+/build/*
+!/build/build.xml
+!/build/package-include.txt
+!/build/package-exclude.txt
+/tests/cache/
+/cgi-bin/

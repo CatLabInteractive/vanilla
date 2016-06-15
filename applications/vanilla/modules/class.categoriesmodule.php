@@ -1,75 +1,78 @@
-<?php if (!defined('APPLICATION')) exit();
-/*
-Copyright 2008, 2009 Vanilla Forums Inc.
-This file is part of Garden.
-Garden is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-Garden is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-You should have received a copy of the GNU General Public License along with Garden.  If not, see <http://www.gnu.org/licenses/>.
-Contact Vanilla Forums Inc. at support [at] vanillaforums [dot] com
-*/
+<?php
+/**
+ * Categories module
+ *
+ * @copyright 2009-2016 Vanilla Forums Inc.
+ * @license http://www.opensource.org/licenses/gpl-2.0.php GNU GPL v2
+ * @package Vanilla
+ * @since 2.0
+ */
 
 /**
  * Renders the discussion categories.
  */
 class CategoriesModule extends Gdn_Module {
 
-   public $startDepth = 1; //inclusive
-   public $endDepth; //inclusive
+    /** @var int Inclusive. */
+    public $startDepth = 1;
 
-   public function __construct($Sender = '') {
-      parent::__construct($Sender);
-      $this->_ApplicationFolder = 'vanilla';
+    /** @var int Inclusive. */
+    public $endDepth;
 
-      $this->Visible = C('Vanilla.Categories.Use') && !C('Vanilla.Categories.HideModule');
-   }
+    public function __construct($Sender = '') {
+        parent::__construct($Sender);
+        $this->_ApplicationFolder = 'vanilla';
 
-   public function AssetTarget() {
-      return 'Panel';
-   }
+        $this->Visible = c('Vanilla.Categories.Use') && !c('Vanilla.Categories.HideModule');
+    }
 
-   /**
-    * Get the data for this module.
-    */
-   protected function GetData() {
-      // Allow plugins to set different data.
-      $this->FireEvent('GetData');
-      if ($this->Data) {
-         return;
-      }
+    public function assetTarget() {
+        return 'Panel';
+    }
 
-      $Categories = CategoryModel::Categories();
-      $Categories2 = $Categories;
+    /**
+     * Get the data for this module.
+     */
+    protected function getData() {
+        // Allow plugins to set different data.
+        $this->fireEvent('GetData');
+        if ($this->Data) {
+            return;
+        }
 
-      // Filter out the categories we aren't watching.
-      foreach ($Categories2 as $i => $Category) {
-         if (!$Category['PermsDiscussionsView'] || !$Category['Following']) {
-            unset($Categories[$i]);
-         }
-      }
+        $Categories = CategoryModel::categories();
+        $Categories2 = $Categories;
 
-      $Data = new Gdn_DataSet($Categories);
-      $Data->DatasetType(DATASET_TYPE_ARRAY);
-      $Data->DatasetType(DATASET_TYPE_OBJECT);
-      $this->Data = $Data;
-   }
-
-   public function filterDepth(&$Categories, $startDepth, $endDepth) {
-      if ($startDepth != 1 || $endDepth) {
-         foreach ($Categories as $i => $Category) {
-            if (val('Depth', $Category) < $startDepth || ($endDepth && val('Depth', $Category) > $endDepth)) {
-               unset($Categories[$i]);
+        // Filter out the categories we aren't watching.
+        foreach ($Categories2 as $i => $Category) {
+            if (!$Category['PermsDiscussionsView'] || !$Category['Following']) {
+                unset($Categories[$i]);
             }
-         }
-      }
-   }
+        }
 
-   public function ToString() {
-      if (!$this->Data) {
-         $this->GetData();
-      }
+        $Data = new Gdn_DataSet($Categories);
+        $Data->DatasetType(DATASET_TYPE_ARRAY);
+        $Data->DatasetType(DATASET_TYPE_OBJECT);
+        $this->Data = $Data;
+    }
 
-      $this->filterDepth($this->Data->Result(), $this->startDepth, $this->endDepth);
+    public function filterDepth(&$Categories, $startDepth, $endDepth) {
+        if ($startDepth != 1 || $endDepth) {
+            foreach ($Categories as $i => $Category) {
+                if (val('Depth', $Category) < $startDepth || ($endDepth && val('Depth', $Category) > $endDepth)) {
+                    unset($Categories[$i]);
+                }
+            }
+        }
+    }
 
-      return parent::ToString();
-   }
+    public function toString() {
+        if (!$this->Data) {
+            $this->GetData();
+        }
+
+        $this->filterDepth($this->Data->result(), $this->startDepth, $this->endDepth);
+
+        return parent::ToString();
+    }
 }

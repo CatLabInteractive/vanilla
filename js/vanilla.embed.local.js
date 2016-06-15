@@ -1,137 +1,179 @@
 (function(window, $, Vanilla) {
-   // Check to see if we are even embedded.
-   if (window.top == window.self)
-      return;
+    /**
+     * Check to see if the page should be force-embedded.
+     */
+    Vanilla.parent.forceEmbed = function() {
+        var forceEmbedDashboard = gdn.getMeta('ForceEmbedDashboard') == '1',
+            forceEmbedForum = gdn.getMeta('ForceEmbedForum') == '1',
+            inConnect = window.location.pathname.indexOf("/entry/connect") >= 0,
+            inDashboard = gdn.getMeta('InDashboard') == '1',
+            inIframe = window.top != window.self,
+            inPopup = window.opener != null;
 
-   // Call a remote function in the parent.
-   Vanilla.parent.callRemote = function(func, args, success, failure) {
-      window.parent.callRemote(func, args, success, failure);
-   };
+        if (!inIframe && !inPopup && !inConnect && ((inDashboard && forceEmbedDashboard) || (!inDashboard && forceEmbedForum))) {
+            document.location = Vanilla.parent.remoteUrl(null);
+        }
+    };
 
-   var minHeight = 0;
-   Vanilla.parent.adjustPopupPosition = function(pos) {
-       var height = document.body.offsetHeight || document.body.scrollHeight;
+    /**
+     * Return the deep link URL of the parent page for a given path.
+     * @param path The path to link to or the current path if null.
+     * @returns Returns the URL of the deep link.
+     */
+    Vanilla.parent.remoteUrl = function (path) {
+        if (path === null) {
+            path = gdn.getMeta('Path', '/');
+        }
 
-       // Fix windows that are too small for the popup.
-       if (height < $('div.Popup').outerHeight()) {
-          height = minHeight = $('div.Popup').outerHeight();
-          Vanilla.parent.setHeight();
-       }
+        if (path.length == 0 || path[0] != '/') {
+            path = '/' + path;
+        }
 
-       var bottom0 = height - (pos.top + pos.height);
-       if (bottom0 < 0)
-           bottom0 = 0;
+        var remoteUrlFormat = gdn.getMeta('RemoteUrlFormat', gdn.getMeta('RemoteUrl', '') + '#%s');
+        var result = remoteUrlFormat.replace('%s', path);
 
-       // Move the inform messages.
-       $('.InformMessages').animate({ bottom: bottom0 });
+        return result;
+    };
 
-       if (height < pos.height) {
-          pos.height = height;
-       }
+    // Check to see if we are even embedded.
+    if (window.top == window.self) {
+        Vanilla.parent.forceEmbed();
+        return;
+    }
 
-       // Move the popup.
-       $('div.Popup').each(function() {
-           var newTop = pos.top + (pos.height - $(this).height()) / 2.2;
-           if (newTop < 0) {
-              newTop = 0;
-           }
-           $(this).animate({ top: newTop});
-       });
-   }
-   $(document).on('informMessage popupReveal', function() {
-       Vanilla.parent.callRemote('getScrollPosition', [], Vanilla.parent.adjustPopupPosition);
-   });
+    // Call a remote function in the parent.
+    Vanilla.parent.callRemote = function(func, args, success, failure) {
+        window.parent.callRemote(func, args, success, failure);
+    };
 
-   Vanilla.parent.signout = function() { $.post('/entry/signout.json'); };
+    var minHeight = 0;
+    Vanilla.parent.adjustPopupPosition = function(pos) {
+        var height = document.body.offsetHeight || document.body.scrollHeight;
 
-   Vanilla.scrollTo = function(q) {
-      var top = $(q).offset().top;
-      Vanilla.parent.callRemote('scrollTo', top);
-      return false;
-   };
+        // Fix windows that are too small for the popup.
+        if (height < $('div.Popup').outerHeight()) {
+            height = minHeight = $('div.Popup').outerHeight();
+            Vanilla.parent.setHeight();
+        }
 
-   Vanilla.urlType = function(url) {
-      var regex = /^#/;
-      if (regex.test(url))
-         return 'hash';
+        var bottom0 = height - (pos.top + pos.height);
+        if (bottom0 < 0)
+            bottom0 = 0;
 
-      // Test for an internal link with no domain.
-      regex = /^(https?:)?\/\//i;
-      if (!regex.test(url))
-         return 'internal';
+        // Move the inform messages.
+        $('.InformMessages').animate({bottom: bottom0});
 
-      // Test for the same domain.
-      regex = new RegExp("//" + location.host + "($|[/?#])");
-      if (regex.test(url))
-         return 'internal';
+        if (height < pos.height) {
+            pos.height = height;
+        }
 
-      // Test for a subdomain.
-      var parts = location.host.split(".");
-      if (parts.length > 2)
-         parts = parts.slice(parts.length - 2);
-      var domain = parts.join(".");
+        // Move the popup.
+        $('div.Popup').each(function() {
+            var newTop = pos.top + (pos.height - $(this).height()) / 2.2;
+            if (newTop < 0) {
+                newTop = 0;
+            }
+            $(this).animate({top: newTop});
+        });
+    }
+    $(document).on('informMessage popupReveal', function() {
+        Vanilla.parent.callRemote('getScrollPosition', [], Vanilla.parent.adjustPopupPosition);
+    });
 
-      regex = new RegExp("//.+\\." + domain + "($|[/?#])");
-      if (regex.test(url))
-         return "subdomain";
+    Vanilla.parent.signout = function() {
+        $.post('/entry/signout.json');
+    };
 
-      return "external";
-   };
+    Vanilla.scrollTo = function(q) {
+        var top = $(q).offset().top;
+        Vanilla.parent.callRemote('scrollTo', top);
+        return false;
+    };
 
-   var currentHeight = null;
-   Vanilla.parent.setHeight = function() {
-      // Set the height of the iframe based on vanilla.
-      var height = document.body.offsetHeight || document.body.scrollHeight;
+    Vanilla.urlType = function(url) {
+        var regex = /^#/;
+        if (regex.test(url))
+            return 'hash';
 
-      if (height < minHeight) {
-         height = minHeight;
-      }
+        // Test for an internal link with no domain.
+        regex = /^(https?:)?\/\//i;
+        if (!regex.test(url))
+            return 'internal';
 
-      if (height != currentHeight) {
-         currentHeight = height;
+        // Test for the same domain.
+        regex = new RegExp("//" + location.host + "($|[/?#])");
+        if (regex.test(url))
+            return 'internal';
+
+        // Test for a subdomain.
+        var parts = location.host.split(".");
+        if (parts.length > 2)
+            parts = parts.slice(parts.length - 2);
+        var domain = parts.join(".");
+
+        regex = new RegExp("//.+\\." + domain + "($|[/?#])");
+        if (regex.test(url))
+            return "subdomain";
+
+        return "external";
+    };
+
+    var currentHeight = null;
+    Vanilla.parent.setHeight = function() {
+        // Set the height of the iframe based on vanilla.
+        var height = document.body.offsetHeight || document.body.scrollHeight;
+
+        if (height < minHeight) {
+            height = minHeight;
+        }
+
+        if (height != currentHeight) {
+            currentHeight = height;
 //         console.log('setHeight: ' + height);
-         Vanilla.parent.callRemote('height', height);
-      }
-   }
+            Vanilla.parent.callRemote('height', height);
+        }
+    }
 
-   $(window).load(function() {
-      Vanilla.parent.setHeight();
-      Vanilla.parent.callRemote('notifyLocation', window.location.href);
+    $(window).load(function() {
+        Vanilla.parent.setHeight();
+        Vanilla.parent.callRemote('notifyLocation', window.location.href);
 
-      setInterval(Vanilla.parent.setHeight, 300);
-   });
+        setInterval(Vanilla.parent.setHeight, 300);
+    });
 
-   $(window).unload(function() {
-      window.parent.hide();
-   });
+    $(window).unload(function() {
+        window.parent.hide();
+    });
 
-   $(document).on('click', 'a', function (e) {
-      var href = $(this).attr('href');
-      if (!href)
-         return;
+    $(document).on('click', 'a', function(e) {
+        var href = $(this).attr('href');
+        if (!href)
+            return;
 
-      switch (Vanilla.urlType(href)) {
-         case 'subdomain':
-            $(this).attr('target', '_top');
-            break;
-         case 'external':
-            $(this).attr('target', '_blank');
-            break;
-         case 'internal':
-            $(this).attr('target', '');
-            break;
-      }
-   });
+        switch (Vanilla.urlType(href)) {
+            case 'subdomain':
+                $(this).attr('target', '_top');
+                break;
+            case 'external':
+                $(this).attr('target', '_blank');
+                break;
+            case 'internal':
+                $(this).attr('target', '');
+                break;
+        }
+    });
 
-   $(window).unload(function() { Vanilla.parent.callRemote('scrollTo', 0); });
+    $(window).unload(function() {
+        Vanilla.parent.callRemote('scrollTo', 0);
+    });
 })(window, jQuery, Vanilla);
 
 jQuery(document).ready(function($) {
-   if (window.top == window.self)
-      return;
+    if (window.top == window.self)
+        return;
 
-   Vanilla.parent.setHeight();
-   window.parent.show();
+    Vanilla.parent.setHeight();
+    window.parent.show();
 
-   $('body').addClass('Embedded');
+    $('body').addClass('Embedded');
 });
